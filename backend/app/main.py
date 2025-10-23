@@ -6,6 +6,7 @@ import secrets
 import ssl
 import pymysql
 from decimal import Decimal
+from datetime import datetime, date
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -106,6 +107,7 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+            
         if path == '/places':
             return self.list_places()
         elif path == '/me':
@@ -116,13 +118,16 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             self.respond(*json_response({'error': 'Not Found'}, 404))
             
     def do_POST(self):
-        path = self.path
+        path = urlparse(self.path).path
+        
         if path == '/auth/register':
             return self.register()
         elif path == '/auth/login':
             return self.login()
         elif path == '/places':
             return self.create_place()
+        elif path == '/reviews':
+            return self.add_review()
         else:
             self.respond(*json_response({'error': 'Not Found'}, 404))
 
@@ -258,6 +263,89 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
                 )
                 conn.commit()
                 self.respond(*json_response({'id': cursor.lastrowid}, 201))
+
+    # Добавление отзыва — только авторизованные
+    @auth_required
+    def add_review(self):
+        data = parse_json(self)
+
+        # place id (поле "id" из тела)
+        try:
+            place_id = int((data.get('id') or '').strip())
+            if place_id <= 0:
+                raise ValueError
+        except (ValueError, AttributeError):
+            return self.respond(*json_response({'error': 'Invalid place id'}, 400))
+
+        # user id из тела — должен совпадать с токеном
+        try:
+            body_user_id = int((data.get('userid') or '').strip())
+        except (ValueError, AttributeError):
+            return self.respond(*json_response({'error': 'Invalid user id'}, 400))
+
+        if body_user_id != self.user['id']:
+            return self.respond(*json_response({'error': 'Forbidden'}, 403))
+
+        # место существует?
+        with get_db_connection() as conn, conn.cursor() as c:
+            c.execute("SELECT 1 FROM places WHERE id=%s", (place_id,))
+            if not c.fetchone():
+                return self.respond(*json_response({'error': 'Place not found'}, 404))
+
+        # текст
+        text = (data.get('text') or '').strip()
+        if not text:
+            return self.respond(*json_response({'error': 'Text is required'}, 400))
+        if len(text) > 4000:
+            return self.respond(*json_response({'error': 'Text too long (max 4000)'}, 400))
+
+        # дата: 'DD.MM.YYYY' -> DATE
+        raw_date = (data.get('date') or '').strip()
+        if raw_date:
+            try:
+                created_dt = datetime.strptime(raw_date, "%d.%m.%Y").date()
+            except ValueError:
+                return self.respond(*json_response({'error': 'Invalid date format, expected DD.MM.YYYY'}, 400))
+        else:
+            created_dt = date.today()
+
+        # вставка
+        with get_db_connection() as conn, conn.cursor() as c:
+            c.execute(
+                "INSERT INTO reviews (place_id, user_id, text, created_at) VALUES (%s,%s,%s,%s)",
+                (place_id, self.user['id'], text, created_dt)
+            )
+            new_id = c.lastrowid
+            conn.commit()
+
+            # ответ: новые поля, дата уже в нужном формате
+            c.execute("""
+            SELECT id, user_id, text,
+                    DATE_FORMAT(created_at, '%%d.%%m.%%Y') AS date
+            FROM reviews WHERE id=%s
+            """, (new_id,))
+            review = c.fetchone()
+
+        return self.respond(*json_response({'review': review}, 201))
+
+    # Получение отзывов по месту — публично
+    def get_reviews(self, place_id: int):
+        with get_db_connection() as conn, conn.cursor() as c:
+            # Если хочешь вернуть 404, когда места нет — раскомментируй блок ниже.
+            c.execute("SELECT 1 FROM places WHERE id=%s", (place_id,))
+            if not c.fetchone():
+                return self.respond(*json_response({'error': 'Place not found'}, 404))
+
+            c.execute("""
+            SELECT id, user_id, text, DATE_FORMAT(created_at, '%%d.%%m.%%Y') AS date
+            FROM reviews
+            WHERE place_id=%s
+            ORDER BY id DESC
+            """, (place_id,))
+            rows = c.fetchall()
+
+        # Стандартнее вернуть 200 и пустой список, чем 404.
+        return self.respond(*json_response({'reviews': rows}, 200))
 
     # ========== USERS ==============
     @auth_required
