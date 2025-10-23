@@ -13,6 +13,8 @@ CREATE TABLE
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         description TEXT,
+        lat DECIMAL(9,6) NULL,
+        lon DECIMAL(9,6) NULL,
         owner_id INT,
         FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE SET NULL
     );

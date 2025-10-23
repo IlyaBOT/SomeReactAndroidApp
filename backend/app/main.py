@@ -5,6 +5,7 @@ import hashlib
 import secrets
 import ssl
 import pymysql
+from decimal import Decimal
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -79,6 +80,19 @@ def auth_required(fn):
 
 def is_email(s: str) -> bool:
     return bool(s and EMAIL_RE.match(s))
+
+def _json_default(o):
+    if isinstance(o, Decimal):
+        return float(o)
+    # добавь сюда date/datetime при желании
+    raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
+
+def json_response(response, status=200, headers=None):
+    payload = json.dumps(response, default=_json_default).encode('utf-8')
+    hdrs = {'Content-Type': 'application/json; charset=utf-8'}
+    if headers:
+        hdrs.update(headers)
+    return status, hdrs, payload
 
 # ================== HTTP HANDLER ==================
 class SimpleAPIHandler(BaseHTTPRequestHandler):
@@ -213,27 +227,35 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         return False
 
     # ========== PLACES =============
-    @auth_required
+    @auth_required  # или убери, если хочешь публичный список
     def list_places(self):
-        with get_db_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT id, name, description FROM places")
-                places = cursor.fetchall()
-                self.respond(*json_response(places))
+        with get_db_connection() as conn, conn.cursor() as c:
+            c.execute("SELECT id, name, description, lat, lon, owner_id FROM places ORDER BY id DESC")
+            rows = c.fetchall()
+        return self.respond(*json_response(rows, 200))
 
     @auth_required
     def create_place(self):
-        if self.user['role'] not in ('businessOwner', 'moderator', 'admin'):
-            return self.respond(*json_response({'error': 'Forbidden'}, 403))
         data = parse_json(self)
-        name = data.get('name')
-        desc = data.get('description')
-        if not name or not desc:
+        name = (data.get('name') or '').strip()
+        desc = (data.get('description') or '').strip()
+        lat  = data.get('lat')
+        lon  = data.get('lon')
+
+        if not name or lat is None or lon is None:
             return self.respond(*json_response({'error': 'Missing fields'}, 400))
+
+        try:
+            lat = float(lat); lon = float(lon)
+        except (TypeError, ValueError):
+            return self.respond(*json_response({'error': 'Invalid coordinates'}, 400))
+
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO places (name, description, owner_id) VALUES (%s, %s, %s)",
-                               (name, desc, self.user['id']))
+                cursor.execute(
+                    "INSERT INTO places (name, description, owner_id, lat, lon) VALUES (%s,%s,%s,%s,%s)",
+                    (name, desc, self.user['id'], lat, lon)
+                )
                 conn.commit()
                 self.respond(*json_response({'id': cursor.lastrowid}, 201))
 
