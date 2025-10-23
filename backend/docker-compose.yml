@@ -1,25 +1,39 @@
-version: '3'
+# ./docker-compose.yml
 services:
   db:
-    image: mysql:8
+    image: mysql:8.0
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: myapp
+      MYSQL_USER: fastapi_user
+      MYSQL_PASSWORD: fastapi_pass
+      MYSQL_DATABASE: fastapi_db
+      MYSQL_ROOT_PASSWORD: rootpass
+      DB_HOST: db
+      DB_PORT: 3306
     ports:
       - "3306:3306"
     volumes:
-      - db_data:/var/lib/mysql
+      - ./mysql_data:/var/lib/mysql
+      - ./app/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pexample"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   web:
     build: .
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8443:8443"
+    volumes:
+      - .:/app
     environment:
-      DB_HOST: db
-      DB_USER: root
-      DB_PASSWORD: example
-      DB_NAME: myapp
-volumes:
-  db_data:
+      - MYSQL_USER=fastapi_user
+      - MYSQL_PASSWORD=fastapi_pass
+      - MYSQL_DATABASE=fastapi_db
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - DB_HOST=db
+      - DB_PORT=3306

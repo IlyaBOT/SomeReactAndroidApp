@@ -1,4 +1,4 @@
-# vanilla_https_api/server.py
+import os
 import json
 import hashlib
 import secrets
@@ -7,13 +7,16 @@ import pymysql
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CERT_FILE = os.path.join(SCRIPT_DIR, "cert.pem")
+KEY_FILE  = os.path.join(SCRIPT_DIR, "key.pem")
+
 # =================== CONFIG ======================
-DB_CONFIG = {
-    'host': 'db',
-    'user': 'root',
-    'password': 'example',
-    'database': 'myapp'
-}
+DB_USER = os.getenv('MYSQL_USER', 'fastapi_user')
+DB_PASSWORD = os.getenv('MYSQL_PASSWORD', 'fastapi_pass')
+DB_NAME = os.getenv('MYSQL_DATABASE', 'fastapi_db')
+DB_HOST = os.getenv('DB_HOST', 'db')
+DB_PORT = os.getenv('DB_PORT', '3306')
 
 ROLES = ['user', 'businessOwner', 'moderator', 'admin']
 
@@ -37,10 +40,10 @@ def json_response(response, code=200):
 
 def get_db_connection():
     return pymysql.connect(
-        host=DB_CONFIG['host'],
-        user=DB_CONFIG['user'],
-        password=DB_CONFIG['password'],
-        database=DB_CONFIG['database'],
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
         cursorclass=pymysql.cursors.DictCursor
     )
 
@@ -156,7 +159,7 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     httpd = HTTPServer(('0.0.0.0', 8443), SimpleAPIHandler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
+    context.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     print("Server running at https://0.0.0.0:8443")
     httpd.serve_forever()

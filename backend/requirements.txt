@@ -1,1 +1,3 @@
 pymysql
+simpleapi
+cryptography>=42
