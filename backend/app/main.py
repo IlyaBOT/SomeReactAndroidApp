@@ -1,3 +1,4 @@
+import re
 import os
 import json
 import hashlib
@@ -20,6 +21,7 @@ DB_PORT = os.getenv('DB_PORT', '3306')
 
 ROLES = ['user', 'businessOwner', 'moderator', 'admin']
 ALLOWED_SELF_REGISTER_ROLES = {"user", "businessOwner"}
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 # ================== HELPERS ======================
 def generate_token(user_id):
@@ -75,6 +77,8 @@ def auth_required(fn):
         return fn(self, *args, **kwargs)
     return wrapper
 
+def is_email(s: str) -> bool:
+    return bool(s and EMAIL_RE.match(s))
 
 # ================== HTTP HANDLER ==================
 class SimpleAPIHandler(BaseHTTPRequestHandler):
@@ -90,6 +94,8 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == '/places':
             return self.list_places()
+        elif path == '/me':
+            return self.get_me()  # НОВОЕ
         elif path == '/users':
             return self.list_users()   # НОВОЕ
         else:
@@ -131,14 +137,14 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
     # ========== AUTH ROUTES ==========
     def register(self):
         data = parse_json(self)
-        login = data.get('login')
-        passwd = data.get('passwd')
-        # по умолчанию всегда 'user'
-        role = (data.get('role') or 'user').strip()
+        login = (data.get('login') or '').strip()
+        passwd = (data.get('passwd') or '').strip()
+        role   = (data.get('role') or 'user').strip()
+        email  = (data.get('email') or '').strip()
 
-        # валидация: логин/пароль есть, роль допустима ТОЛЬКО из self-регистрации
-        if not login or not passwd or role not in ALLOWED_SELF_REGISTER_ROLES:
-            return self.respond(*json_response({'error': 'Missing fields, invalid or forbidden role'}, 400))
+        # базовая валидация
+        if not login or not passwd or role not in ALLOWED_SELF_REGISTER_ROLES or not is_email(email):
+            return self.respond(*json_response({'error': 'Missing fields or invalid role/email'}, 400))
 
         password_hash = hashlib.sha256(passwd.encode()).hexdigest()
         token = generate_token(login)
@@ -147,29 +153,48 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(
-                        "INSERT INTO users (username, password, role, token) VALUES (%s, %s, %s, %s)",
-                        (login, password_hash, role, token)
+                        "INSERT INTO users (username, email, password, role, token) VALUES (%s, %s, %s, %s, %s)",
+                        (login, email, password_hash, role, token)
                     )
                     conn.commit()
-                    self.respond(*json_response({'id': cursor.lastrowid, 'token': token}, 201))
+                    self.respond(*json_response({
+                        'id': cursor.lastrowid,
+                        'token': token,
+                        'user': {'id': cursor.lastrowid, 'username': login, 'email': email, 'role': role}
+                    }, 201))
         except pymysql.err.IntegrityError:
             self.respond(*json_response({'error': 'User exists'}, 409))
 
     def login(self):
         data = parse_json(self)
-        login = data.get('login')
-        passwd = data.get('passwd')
-        password_hash = hashlib.sha256(passwd.encode()).hexdigest()
+        login = (data.get('login') or '').strip()
+        passwd = (data.get('passwd') or '').strip()
+        if not login or not passwd:
+            return self.respond(*json_response({'error': 'Missing fields'}, 400))
+
+        pwd_hash = hashlib.sha256(passwd.encode()).hexdigest()
+
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT id FROM users WHERE username=%s AND password=%s", (login, password_hash))
+                cursor.execute("SELECT id, username, email, role, password FROM users WHERE username=%s", (login,))
                 user = cursor.fetchone()
-                if not user:
-                    return self.respond(*json_response({'error': 'Invalid credentials'}, 403))
-                token = generate_token(user['id'])
+                if not user or user['password'] != pwd_hash:
+                    return self.respond(*json_response({'error': 'Invalid credentials'}, 401))
+
+                token = generate_token(login)
                 cursor.execute("UPDATE users SET token=%s WHERE id=%s", (token, user['id']))
                 conn.commit()
-                self.respond(*json_response({'id': user['id'], 'token': token}))
+
+                # отдадим токен + профиль
+                return self.respond(*json_response({
+                    'token': token,
+                    'user': {
+                        'id': user['id'],
+                        'username': user['username'],
+                        'email': user['email'],
+                        'role': user['role'],
+                    }
+                }, 200))
                 
     def require_admin(self):
         """
@@ -186,7 +211,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             return True
         self.respond(*json_response({'error': 'Forbidden'}, 403))
         return False
-
 
     # ========== PLACES =============
     @auth_required
@@ -213,6 +237,7 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
                 conn.commit()
                 self.respond(*json_response({'id': cursor.lastrowid}, 201))
 
+    # ========== USERS ==============
     @auth_required
     def list_users(self):
         if not self.require_admin():
@@ -288,6 +313,18 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
                     return self.respond(*json_response({'error': 'User not found'}, 404))
                 conn.commit()
                 return self.respond(*json_response({}, 204))
+
+    @auth_required
+    def get_me(self):
+        # self.user уже содержит id/username/role из декоратора; вытянем email из БД (или добавь в декоратор)
+        uid = self.user['id']
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id, username, email, role FROM users WHERE id=%s", (uid,))
+                me = cursor.fetchone()
+        if not me:
+            return self.respond(*json_response({'error': 'User not found'}, 404))
+        return self.respond(*json_response({'user': me}, 200))
 
 # ================== SERVER BOOT ===================
 if __name__ == '__main__':
