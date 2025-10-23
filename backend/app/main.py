@@ -19,6 +19,7 @@ DB_HOST = os.getenv('DB_HOST', 'db')
 DB_PORT = os.getenv('DB_PORT', '3306')
 
 ROLES = ['user', 'businessOwner', 'moderator', 'admin']
+ALLOWED_SELF_REGISTER_ROLES = {"user", "businessOwner"}
 
 # ================== HELPERS ======================
 def generate_token(user_id):
@@ -93,6 +94,17 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             return self.list_users()   # НОВОЕ
         else:
             self.respond(*json_response({'error': 'Not Found'}, 404))
+            
+    def do_POST(self):
+        path = self.path
+        if path == '/auth/register':
+            return self.register()
+        elif path == '/auth/login':
+            return self.login()
+        elif path == '/places':
+            return self.create_place()
+        else:
+            self.respond(*json_response({'error': 'Not Found'}, 404))
 
     def do_PUT(self):
         # ожидаем /users/{id}
@@ -121,17 +133,23 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         data = parse_json(self)
         login = data.get('login')
         passwd = data.get('passwd')
-        role = data.get('role', 'user')
-        if not login or not passwd or role not in ROLES:
-            return self.respond(*json_response({'error': 'Missing fields or invalid role'}, 400))
+        # по умолчанию всегда 'user'
+        role = (data.get('role') or 'user').strip()
+
+        # валидация: логин/пароль есть, роль допустима ТОЛЬКО из self-регистрации
+        if not login or not passwd or role not in ALLOWED_SELF_REGISTER_ROLES:
+            return self.respond(*json_response({'error': 'Missing fields, invalid or forbidden role'}, 400))
 
         password_hash = hashlib.sha256(passwd.encode()).hexdigest()
         token = generate_token(login)
+
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("INSERT INTO users (username, password, role, token) VALUES (%s, %s, %s, %s)",
-                                   (login, password_hash, role, token))
+                    cursor.execute(
+                        "INSERT INTO users (username, password, role, token) VALUES (%s, %s, %s, %s)",
+                        (login, password_hash, role, token)
+                    )
                     conn.commit()
                     self.respond(*json_response({'id': cursor.lastrowid, 'token': token}, 201))
         except pymysql.err.IntegrityError:
