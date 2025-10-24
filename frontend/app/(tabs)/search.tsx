@@ -26,6 +26,14 @@ import { triggerMapRoute, triggerMapSearch } from '@/lib/map-search';
 import styles from './css/StylesSearch';
 
 type SearchPost = NormalizedPost;
+type YandexSuggestItem = {
+  title: { text: string };
+  subtitle?: { text: string };
+  uri?: string;
+};
+
+
+
 
 const allPostsNormalized = normalizePosts(sourcePosts);
 
@@ -58,6 +66,9 @@ export default function SearchScreen() {
   const [searchActive, setSearchActive] = useState(false);
   const [activePost, setActivePost] = useState<SearchPost | null>(null);
   const [isDetailVisible, setDetailVisible] = useState(false);
+
+  const [suggestions, setSuggestions] = useState<YandexSuggestItem[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const filterPosts = useCallback((data: SearchPost[], category: string, query: string) => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -101,9 +112,26 @@ export default function SearchScreen() {
     setIsSearching(searchQuery.trim().length > 0);
   }, [searchQuery]);
 
-  const handleSearchChange = (text: string) => {
+  const handleSearchChange = async (text: string) => {
     setSearchQuery(text);
+    if (text.length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://suggest-maps.yandex.ru/v1/suggest?apikey=bb90505e-e4be-41cf-b0c1-82ccf1b69041&text=${encodeURIComponent(text)}&lang=ru_RU`
+      );
+      const data = await response.json();
+      setSuggestions(data.results || []);
+      setShowSuggestions(true);
+    } catch (err) {
+      console.error('Suggest error:', err);
+    }
   };
+
 
   const clearSearch = () => {
     setSearchQuery('');
@@ -252,6 +280,39 @@ export default function SearchScreen() {
           )}
         />
       </View>
+      {showSuggestions && suggestions.length > 0 && (
+        <FlatList
+          data={suggestions}
+          keyExtractor={(item, index) => item.uri || index.toString()}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchQuery(item.title.text);
+                setShowSuggestions(false);
+                triggerMapSearch(item.title.text); 
+              }}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderBottomWidth: 1,
+                borderColor: '#eee',
+                backgroundColor: '#fff',
+              }}
+            >
+              <Text>{item.title.text}</Text>
+            </TouchableOpacity>
+          )}
+          style={{
+            position: 'absolute',
+            top: 50,
+            left: 0,
+            right: 0,
+            backgroundColor: '#fff',
+            zIndex: 100,
+            maxHeight: 200,
+          }}
+        />
+      )}
 
       <Animated.View style={[styles.resultsContainer, { opacity: fadeAnim }]}>
         <FlatList
