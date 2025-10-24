@@ -112,15 +112,7 @@ export default function AuthScreen() {
         >
           <View style={styles.card}>
             <View style={styles.header}>
-              <View style={styles.avatarWrapper}>
-                <Ionicons name="person-circle" size={48} color={THEME.primary} />
-              </View>
-              <Text style={styles.title}>{isRegister ? 'Добро пожаловать!' : 'С возвращением!'}</Text>
-              <Text style={styles.subtitle}>
-                {isRegister
-                  ? 'Создайте аккаунт и собирайте любимые места города.'
-                  : 'Войдите, чтобы сохранять маршруты и делиться впечатлениями.'}
-              </Text>
+              <Text style={styles.title}>Добро пожаловать!</Text>
             </View>
 
             <View style={styles.accountTypeWrapper}>
@@ -237,22 +229,13 @@ export default function AuthScreen() {
 
             <TouchableOpacity
               style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}
-              activeOpacity={0.85}
+              activeOpacity={0.55}
               onPress={handleSubmit}
             >
               <Text style={styles.primaryButtonText}>{isRegister ? 'Зарегистрироваться' : 'Войти'}</Text>
             </TouchableOpacity>
 
-            <View style={styles.separator}>
-              <View style={styles.line} />
-              <Text style={styles.separatorText}>или</Text>
-              <View style={styles.line} />
-            </View>
-
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>
-                {isRegister ? 'Уже есть аккаунт?' : 'Нет аккаунта?'}
-              </Text>
               <TouchableOpacity onPress={() => setMode(isRegister ? 'login' : 'register')}>
                 <Text style={styles.switchLink}>{isRegister ? 'Войти' : 'Зарегистрироваться'}</Text>
               </TouchableOpacity>
@@ -303,8 +286,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(37, 99, 235, 0.12)',
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: '800',
     color: THEME.accent,
   },
   subtitle: {
@@ -317,7 +300,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 13,
+    textAlign: 'center',
+    fontSize: 14,
     fontWeight: '600',
     color: THEME.accent,
     textTransform: 'uppercase',
@@ -346,17 +330,17 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: THEME.primary,
-    borderRadius: 18,
+    borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
     shadowColor: '#b325ebff',
     shadowOpacity: 0.28,
-    shadowRadius: 20,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 12 },
     elevation: 8,
   },
   primaryButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.85,
   },
   primaryButtonText: {
     color: '#fff',
@@ -379,42 +363,6 @@ const styles = StyleSheet.create({
     color: THEME.muted,
     textTransform: 'uppercase',
   },
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: THEME.border,
-    borderRadius: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f8fbff',
-    justifyContent: 'center',
-  },
-  socialText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: THEME.accent,
-    textAlign: 'center',
-  },
-  socialIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(37, 99, 235, 0.18)',
-  },
-  socialLetter: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: THEME.accent,
-  },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -426,9 +374,18 @@ const styles = StyleSheet.create({
     color: THEME.muted,
   },
   switchLink: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: THEME.primary,
+    padding: 8,
+    backgroundColor: THEME.primary,
+    color: "#FFF",
+    fontWeight: 600,
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#b325ebff',
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
   accountTypeRow: {
     flexDirection: 'row',
@@ -441,9 +398,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   accountTypeLabel: {
-    fontSize: 12,
+    textAlign: 'center',
+    fontSize: 14,
     fontWeight: '600',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     color: THEME.accent,
     textTransform: 'uppercase',
   },
