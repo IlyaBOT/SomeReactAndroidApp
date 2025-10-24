@@ -23,14 +23,22 @@ type GlobalWithSession = typeof globalThis & {
 };
 
 export function setUserSession(session: UserSession) {
+  try { localStorage.setItem('user', JSON.stringify(session)); } catch {}
   (globalThis as GlobalWithSession).__CITY_GUIDE_USER__ = session;
 }
 
 export function getUserSession(): UserSession | null {
+  try {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      return JSON.parse(userData);
+    }
+  } catch {}
   return ((globalThis as GlobalWithSession).__CITY_GUIDE_USER__ ?? null);
 }
 
 export function clearUserSession() {
+  try { localStorage.removeItem('user'); localStorage.removeItem('token'); } catch {}
   if ('__CITY_GUIDE_USER__' in (globalThis as GlobalWithSession)) {
     delete (globalThis as GlobalWithSession).__CITY_GUIDE_USER__;
   }

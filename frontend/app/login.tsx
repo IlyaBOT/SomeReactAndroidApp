@@ -1,21 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  StyleSheet, // ← вот этого не хватало
 } from 'react-native';
 
-import { posts } from '@/constants/content';
 import { setUserSession, type UserSession } from '@/lib/user-session';
 
 const THEME = {
@@ -40,55 +37,84 @@ export default function AuthScreen() {
   const isRegister = mode === 'register';
   const isCompany = accountType === 'company';
 
-  const sampleFavorites = useMemo(() => posts.slice(0, 3).map(post => post.id), []);
-  const sampleLiked = useMemo(() => posts.slice(1, 4).map(post => post.id), []);
-  const sampleFollowing = useMemo(
-    () =>
-      posts.slice(0, 5).map(post => ({
-        id: post.id,
-        name: post.user,
-        handle: post.userHandle,
-        avatar: post.userAvatar,
-        description: post.bio,
-      })),
-    []
-  );
-
   const canSubmit =
     email.trim().length > 0 &&
     password.trim().length > 0 &&
     (!isRegister || (isCompany ? companyName.trim().length > 0 : name.trim().length > 0));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) {
-      Alert.alert('Пожалуйста, заполните все поля', 'Укажите почту, пароль и имя, чтобы продолжить.');
+      Alert.alert('Ошибка', 'Пожалуйста, заполните все поля.');
       return;
     }
-
     Keyboard.dismiss();
-
-    const primaryName =
-      (isRegister ? (isCompany ? companyName.trim() : name.trim()) : name.trim()) ||
-      email.trim().split('@')[0] ||
-      'Гость';
-
-    const normalizedHandle =
-      email.trim().split('@')[0]?.replace(/[^a-z0-9_]/gi, '').toLowerCase() || `user${Date.now()}`;
-
-    const session: UserSession = {
-      id: `user-${Date.now()}`,
-      name: primaryName,
-      email: email.trim(),
-      handle: normalizedHandle,
-      avatar: `https://i.pravatar.cc/200?u=${encodeURIComponent(email.trim() || primaryName)}`,
-      accountType,
-      favorites: sampleFavorites,
-      liked: sampleLiked,
-      following: sampleFollowing,
-    };
-
-    setUserSession(session);
-    router.replace('/profile');
+    if (isRegister) {
+      // Регистрация
+      const role = isCompany ? 'businessOwner' : 'user';
+      const loginValue = email.trim();
+      try {
+        const res = await fetch('https://localhost:8443/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ login: loginValue, passwd: password.trim(), role, email: email.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          Alert.alert('Ошибка регистрации', data.error || 'Регистрация не удалась');
+          return;
+        }
+        // Успешная регистрация: получаем токен и пользователя
+        const sessionUser = data.user;
+        const session: UserSession = {
+          id: sessionUser.id.toString(),
+          name: sessionUser.username,
+          email: sessionUser.email,
+          handle: sessionUser.username.includes('@') ? sessionUser.username.split('@')[0] : sessionUser.username,
+          avatar: `https://i.pravatar.cc/200?u=${encodeURIComponent(sessionUser.email)}`,
+          accountType: isCompany ? 'company' : 'user',
+          favorites: [],
+          liked: [],
+          following: [],
+        };
+        localStorage.setItem('token', data.token);
+        setUserSession(session);
+        router.replace('/profile');
+      } catch (error) {
+        Alert.alert('Ошибка сети', 'Не удалось подключиться к серверу.');
+      }
+    } else {
+      // Вход
+      try {
+        const res = await fetch('https://localhost:8443/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ login: email.trim(), passwd: password.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          Alert.alert('Ошибка входа', data.error || 'Вход не удался');
+          return;
+        }
+        const sessionUser = data.user;
+        const accountType = sessionUser.role === 'businessOwner' ? 'company' : 'user';
+        const session: UserSession = {
+          id: sessionUser.id.toString(),
+          name: sessionUser.username,
+          email: sessionUser.email,
+          handle: sessionUser.username.includes('@') ? sessionUser.username.split('@')[0] : sessionUser.username,
+          avatar: `https://i.pravatar.cc/200?u=${encodeURIComponent(sessionUser.email)}`,
+          accountType,
+          favorites: [],
+          liked: [],
+          following: [],
+        };
+        localStorage.setItem('token', data.token);
+        setUserSession(session);
+        router.replace('/profile');
+      } catch (error) {
+        Alert.alert('Ошибка сети', 'Не удалось подключиться к серверу.');
+      }
+    }
   };
 
   return (
@@ -105,11 +131,6 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.root}
       >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
           <View style={styles.card}>
             <View style={styles.header}>
               <Text style={styles.title}>Добро пожаловать!</Text>
@@ -241,7 +262,6 @@ export default function AuthScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </ScrollView>
       </KeyboardAvoidingView>
     </>
   );
