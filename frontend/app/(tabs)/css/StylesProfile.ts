@@ -37,12 +37,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
-    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+    backgroundColor: 'rgba(144, 32, 178, 0.12)',
   },
   accountTagText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#1d4ed8',
+    color: '#6e0aa4',
   },
   statsRow: {
     flexDirection: 'row',
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   logoutText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#ef4444',
   },

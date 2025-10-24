@@ -29,66 +29,90 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [name, setName] = useState(''); // логин для физ. лица
   const [companyName, setCompanyName] = useState('');
-  const [companyINN, setCompanyINN] = useState('');
+  const [companyINN, setCompanyINN] = useState(''); // логин для юр. лица (ИНН)
   const [accountType, setAccountType] = useState<'user' | 'company'>('user');
 
   const isRegister = mode === 'register';
   const isCompany = accountType === 'company';
 
-  const canSubmit =
-    email.trim().length > 0 &&
-    password.trim().length > 0 &&
-    (!isRegister || (isCompany ? companyName.trim().length > 0 : name.trim().length > 0));
+  // ✅ правильные правила валидации
+  const canSubmit = isRegister
+    ? (
+        // при регистрации нужен пароль и email
+        password.trim().length > 0 &&
+        email.trim().length > 0 &&
+        (
+          // user: нужен ЛОГИН (name)
+          (!isCompany && name.trim().length > 0) ||
+          // company: нужен ИНН и имя компании
+          (isCompany && companyINN.trim().length > 0 && companyName.trim().length > 0)
+        )
+      )
+    : (
+        // вход: пароль + (логин ИЛИ ИНН в зависимости от типа)
+        password.trim().length > 0 &&
+        (
+          (!isCompany && name.trim().length > 0) ||
+          (isCompany && companyINN.trim().length > 0)
+        )
+      );
 
   const handleSubmit = async () => {
     if (!canSubmit) {
-      Alert.alert('Ошибка', 'Пожалуйста, заполните все поля.');
+      Alert.alert('Ошибка', 'Пожалуйста, заполните все обязательные поля.');
       return;
     }
     Keyboard.dismiss();
+
     if (isRegister) {
       // Регистрация
       const role = isCompany ? 'businessOwner' : 'user';
-      const loginValue = email.trim();
+      const loginValue = isCompany ? companyINN.trim() : name.trim();
+
       try {
         const res = await fetch('http://localhost:8443/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ login: loginValue, passwd: password.trim(), role, email: email.trim() }),
+          body: JSON.stringify({
+            login: loginValue,
+            passwd: password.trim(),
+            role,
+            email: email.trim(),
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
           Alert.alert('Ошибка регистрации', data.error || 'Регистрация не удалась');
           return;
         }
-        // Успешная регистрация: получаем токен и пользователя
         const sessionUser = data.user;
         const session: UserSession = {
-          id: sessionUser.id.toString(),
+          id: String(sessionUser.id),
           name: sessionUser.username,
           email: sessionUser.email,
-          handle: sessionUser.username.includes('@') ? sessionUser.username.split('@')[0] : sessionUser.username,
-          avatar: `https://i.pravatar.cc/200?u=${encodeURIComponent(sessionUser.email)}`,
+          handle: sessionUser.username,
           accountType: isCompany ? 'company' : 'user',
           favorites: [],
           liked: [],
           following: [],
         };
-        localStorage.setItem('token', data.token);
+        try { localStorage.setItem('token', data.token); } catch {}
         setUserSession(session);
         router.replace('/profile');
-      } catch (error) {
+      } catch (_) {
         Alert.alert('Ошибка сети', 'Не удалось подключиться к серверу.');
       }
     } else {
       // Вход
+      const loginValue = isCompany ? companyINN.trim() : name.trim();
+
       try {
         const res = await fetch('http://localhost:8443/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ login: email.trim(), passwd: password.trim() }),
+          body: JSON.stringify({ login: loginValue, passwd: password.trim() }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -98,20 +122,19 @@ export default function AuthScreen() {
         const sessionUser = data.user;
         const accountType = sessionUser.role === 'businessOwner' ? 'company' : 'user';
         const session: UserSession = {
-          id: sessionUser.id.toString(),
+          id: String(sessionUser.id),
           name: sessionUser.username,
           email: sessionUser.email,
-          handle: sessionUser.username.includes('@') ? sessionUser.username.split('@')[0] : sessionUser.username,
-          avatar: `https://i.pravatar.cc/200?u=${encodeURIComponent(sessionUser.email)}`,
+          handle: sessionUser.username,
           accountType,
           favorites: [],
           liked: [],
           following: [],
         };
-        localStorage.setItem('token', data.token);
+        try { localStorage.setItem('token', data.token); } catch {}
         setUserSession(session);
         router.replace('/profile');
-      } catch (error) {
+      } catch (_) {
         Alert.alert('Ошибка сети', 'Не удалось подключиться к серверу.');
       }
     }
@@ -272,14 +295,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#351f3b',
   },
-  scroll: {
-    flexGrow: 1,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   card: {
-    width: '100%',
+    width: '95%',
     maxWidth: 420,
     backgroundColor: THEME.surface,
     borderRadius: 26,
@@ -296,14 +313,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     gap: 12,
-  },
-  avatarWrapper: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(37, 99, 235, 0.12)',
   },
   title: {
     fontSize: 32,

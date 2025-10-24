@@ -78,10 +78,8 @@ export default function ProfileScreen() {
             Здравствуйте, {session.name}!
           </ThemedText>
           <View style={styles.accountTag}>
-            <Ionicons name={session.accountType === 'company' ? 'business' : 'mail'} size={16} color="#6e0aa4" />
-            <Text style={styles.accountTagText}>
-              {session.accountType === 'company' ? 'Аккаунт компании' : session.handle}
-            </Text>
+            <Ionicons name='mail' size={18} color="#6e0aa4" />
+            <Text style={styles.accountTagText}>{session.email}</Text>
           </View>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.85}>
             <Ionicons name="log-out-outline" size={18} color="#ef4444" />

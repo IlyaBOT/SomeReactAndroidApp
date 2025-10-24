@@ -5,7 +5,6 @@ export type UserSession = {
   name: string;
   email: string;
   handle: string;
-  avatar: string;
   accountType: 'user' | 'company';
   favorites: string[]; // Post IDs
   liked: string[]; // Post IDs
