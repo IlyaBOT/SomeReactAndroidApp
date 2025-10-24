@@ -267,7 +267,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         return False
 
     # ========== PLACES =============
-    @auth_required
     def list_places(self):
         with get_db_connection() as conn, conn.cursor() as c:
             c.execute("SELECT id, name, description, lat, lon, owner_id FROM places ORDER BY id DESC")

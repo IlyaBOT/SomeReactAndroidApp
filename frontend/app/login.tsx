@@ -37,7 +37,6 @@ export default function AuthScreen() {
   const isRegister = mode === 'register';
   const isCompany = accountType === 'company';
 
-  // ✅ правильные правила валидации
   const canSubmit = isRegister
     ? (
         // при регистрации нужен пароль и email
