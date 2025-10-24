@@ -154,6 +154,7 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.root}
       >
+        <View style={styles.center}>
           <View style={styles.card}>
             <View style={styles.header}>
               <Text style={styles.title}>Добро пожаловать!</Text>
@@ -285,6 +286,7 @@ export default function AuthScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
       </KeyboardAvoidingView>
     </>
   );
@@ -294,6 +296,12 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#351f3b',
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,           // чтобы карточка не липла к краям на узких экранах
   },
   card: {
     width: '95%',
