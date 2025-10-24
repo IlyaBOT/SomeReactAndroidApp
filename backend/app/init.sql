@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at DATE NOT NULL DEFAULT (CURRENT_DATE),
   CONSTRAINT fk_reviews_place  FOREIGN KEY (place_id) REFERENCES places(id) ON DELETE CASCADE,
   CONSTRAINT fk_reviews_user   FOREIGN KEY (user_id)  REFERENCES users(id)  ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB;
 
 -- Нужные индексы
 CREATE INDEX idx_reviews_place_id ON reviews(place_id);

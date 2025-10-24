@@ -107,13 +107,15 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
-            
-        if path == '/places':
+        
+        if path == '/reviews':
+            return self.get_reviews()
+        elif path == '/places':
             return self.list_places()
         elif path == '/me':
-            return self.get_me()  # НОВОЕ
+            return self.get_me()
         elif path == '/users':
-            return self.list_users()   # НОВОЕ
+            return self.list_users()
         else:
             self.respond(*json_response({'error': 'Not Found'}, 404))
             
@@ -329,24 +331,54 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         return self.respond(*json_response({'review': review}, 201))
 
     # Получение отзывов по месту — публично
-    def get_reviews(self, place_id: int):
+    def get_reviews(self):
+        # 1) пробуем взять id из query (?id=1)
+        parsed = urlparse(self.path)
+        qs = dict((k, v[0]) for k, v in parse_qs(parsed.query).items())
+        raw_id = qs.get('id')
+
+        # 2) если в query нет — попробуем из JSON-тела (на случай, если шлёшь как в POST)
+        if raw_id is None:
+            try:
+                body = parse_json(self) or {}
+            except Exception:
+                body = {}
+            raw_id = body.get('id', body.get('place_id'))
+
+        # 3) валидация id
+        try:
+            place_id = int(str(raw_id).strip())
+            if place_id <= 0:
+                raise ValueError
+        except (TypeError, ValueError, AttributeError):
+            return self.respond(*json_response({'error': 'Invalid place id'}, 400))
+
+        # 4) место существует?
         with get_db_connection() as conn, conn.cursor() as c:
-            # Если хочешь вернуть 404, когда места нет — раскомментируй блок ниже.
             c.execute("SELECT 1 FROM places WHERE id=%s", (place_id,))
             if not c.fetchone():
                 return self.respond(*json_response({'error': 'Place not found'}, 404))
 
+            # 5) забираем отзывы (новые сверху) и сразу форматируем дату
             c.execute("""
-            SELECT id, user_id, text, DATE_FORMAT(created_at, '%%d.%%m.%%Y') AS date
+            SELECT id,
+                    user_id   AS userid,
+                    text,
+                    DATE_FORMAT(created_at, '%%d.%%m.%%Y') AS date
             FROM reviews
             WHERE place_id=%s
             ORDER BY id DESC
             """, (place_id,))
             rows = c.fetchall()
 
-        # Стандартнее вернуть 200 и пустой список, чем 404.
-        return self.respond(*json_response({'reviews': rows}, 200))
+        # 6) привести id/ userid к строкам, как ты просил
+        for r in rows:
+            r['id'] = str(r['id'])
+            r['userid'] = str(r['userid'])
 
+        # 7) если отзывов нет — вернём 200 и пустой список (удобнее, чем 404)
+        return self.respond(*json_response({'reviews': rows}, 200))
+    
     # ========== USERS ==============
     @auth_required
     def list_users(self):
