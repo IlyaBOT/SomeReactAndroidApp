@@ -53,7 +53,7 @@ export default function AuthScreen() {
       const role = isCompany ? 'businessOwner' : 'user';
       const loginValue = email.trim();
       try {
-        const res = await fetch('https://localhost:8443/auth/register', {
+        const res = await fetch('http://localhost:8443/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ login: loginValue, passwd: password.trim(), role, email: email.trim() }),
@@ -85,7 +85,7 @@ export default function AuthScreen() {
     } else {
       // Вход
       try {
-        const res = await fetch('https://localhost:8443/auth/login', {
+        const res = await fetch('http://localhost:8443/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ login: email.trim(), passwd: password.trim() }),

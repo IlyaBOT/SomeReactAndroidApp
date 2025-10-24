@@ -37,3 +37,4 @@ services:
       - MYSQL_ROOT_PASSWORD=rootpass
       - DB_HOST=db
       - DB_PORT=3306
+      - USE_TLS=0

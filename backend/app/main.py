@@ -25,6 +25,15 @@ ROLES = ['user', 'businessOwner', 'moderator', 'admin']
 ALLOWED_SELF_REGISTER_ROLES = {"user", "businessOwner"}
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
+# CORS: добавь сюда свои фронтовые origin'ы
+ALLOWED_ORIGINS = {
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+}
+# Если хочешь максимально расслабить на dev: ALLOWED_ORIGINS = set() и мы вернём "*"
+
 # ================== HELPERS ======================
 def generate_token(user_id):
     raw = f"{user_id}:{secrets.token_hex(16)}"
@@ -33,15 +42,31 @@ def generate_token(user_id):
 def parse_json(request):
     content_length = int(request.headers.get('Content-Length', 0))
     body = request.rfile.read(content_length)
+    if not body:
+        return {}
     return json.loads(body.decode('utf-8'))
 
-def json_response(response, code=200):
-    payload = json.dumps(response).encode('utf-8')
-    response_headers = [
-        ('Content-Type', 'application/json'),
-        ('Content-Length', str(len(payload)))
+def _json_default(o):
+    if isinstance(o, Decimal):
+        return float(o)
+    if isinstance(o, (datetime, date)):
+        return o.isoformat()
+    raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
+
+def json_response(response, status=200, headers=None):
+    """Единая корректная версия: возвращает (status, [(k,v)...], payload)"""
+    payload = json.dumps(response, default=_json_default).encode('utf-8')
+    base_headers = [
+        ('Content-Type', 'application/json; charset=utf-8'),
+        ('Content-Length', str(len(payload))),
     ]
-    return code, response_headers, payload
+    if headers:
+        # поддержим как dict, так и список пар
+        if isinstance(headers, dict):
+            base_headers.extend([(k, str(v)) for k, v in headers.items()])
+        else:
+            base_headers.extend(headers)
+    return status, base_headers, payload
 
 def get_db_connection():
     return pymysql.connect(
@@ -55,16 +80,12 @@ def get_db_connection():
 def auth_required(fn):
     def wrapper(self, *args, **kwargs):
         auth_header = self.headers.get('Authorization', '')
-        # Пример корректного вида: Authorization: Bearer <token>
         parts = auth_header.split()
-
         if len(parts) != 2 or parts[0].lower() != 'bearer' or not parts[1].strip():
             self.respond(*json_response({'error': 'Unauthorized'}, 401))
             return
 
         token = parts[1].strip()
-
-        # Достаём пользователя по токену
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("SELECT id, username, role FROM users WHERE token=%s", (token,))
@@ -74,7 +95,6 @@ def auth_required(fn):
             self.respond(*json_response({'error': 'Unauthorized'}, 401))
             return
 
-        # Прокинем в хендлер
         self.user = user  # {'id': ..., 'username': ..., 'role': ...}
         return fn(self, *args, **kwargs)
     return wrapper
@@ -82,32 +102,54 @@ def auth_required(fn):
 def is_email(s: str) -> bool:
     return bool(s and EMAIL_RE.match(s))
 
-def _json_default(o):
-    if isinstance(o, Decimal):
-        return float(o)
-    # добавь сюда date/datetime при желании
-    raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
-
-def json_response(response, status=200, headers=None):
-    payload = json.dumps(response, default=_json_default).encode('utf-8')
-    hdrs = {'Content-Type': 'application/json; charset=utf-8'}
-    if headers:
-        hdrs.update(headers)
-    return status, hdrs, payload
+def cors_headers(request):
+    origin = request.headers.get('Origin', '')
+    if not ALLOWED_ORIGINS:
+        allow_origin = "*"  # dev-мод: позволить всем
+    else:
+        allow_origin = origin if origin in ALLOWED_ORIGINS else ""
+    headers = []
+    if allow_origin or not ALLOWED_ORIGINS:
+        headers.append(('Access-Control-Allow-Origin', allow_origin or '*'))
+    headers.extend([
+        ('Vary', 'Origin'),
+        ('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS'),
+        ('Access-Control-Allow-Headers', 'Content-Type, Authorization'),
+        ('Access-Control-Max-Age', '86400'),
+        # Для cookies/credentials в dev можно включить, если надо:
+        # ('Access-Control-Allow-Credentials', 'true'),
+    ])
+    return headers
 
 # ================== HTTP HANDLER ==================
 class SimpleAPIHandler(BaseHTTPRequestHandler):
 
     def respond(self, code, headers, payload):
+        # Гарантированно доклеиваем CORS заголовки и удаляем дубликаты по ключу
+        ch = cors_headers(self)
+        # Нормализуем входные headers (support dict)
+        if isinstance(headers, dict):
+            headers = list(headers.items())
+        merged = {}
+        for k, v in (headers + ch):
+            merged[k.lower()] = (k, v)
+        final_headers = list(merged.values())
+
         self.send_response(code)
-        for h in headers:
-            self.send_header(h[0], h[1])
+        for k, v in final_headers:
+            self.send_header(k, v)
         self.end_headers()
-        self.wfile.write(payload)
+
+        if code != 204 and self.command != 'HEAD' and payload:
+            self.wfile.write(payload)
+
+    # Preflight
+    def do_OPTIONS(self):
+        self.respond(204, [], b'')
 
     def do_GET(self):
         path = urlparse(self.path).path
-        
+
         if path == '/reviews':
             return self.get_reviews()
         elif path == '/places':
@@ -118,10 +160,10 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             return self.list_users()
         else:
             self.respond(*json_response({'error': 'Not Found'}, 404))
-            
+
     def do_POST(self):
         path = urlparse(self.path).path
-        
+
         if path == '/auth/register':
             return self.register()
         elif path == '/auth/login':
@@ -134,7 +176,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             self.respond(*json_response({'error': 'Not Found'}, 404))
 
     def do_PUT(self):
-        # ожидаем /users/{id}
         parts = urlparse(self.path).path.strip('/').split('/')
         if len(parts) == 2 and parts[0] == 'users':
             try:
@@ -145,7 +186,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         self.respond(*json_response({'error': 'Not Found'}, 404))
 
     def do_DELETE(self):
-        # ожидаем /users/{id}
         parts = urlparse(self.path).path.strip('/').split('/')
         if len(parts) == 2 and parts[0] == 'users':
             try:
@@ -163,7 +203,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         role   = (data.get('role') or 'user').strip()
         email  = (data.get('email') or '').strip()
 
-        # базовая валидация
         if not login or not passwd or role not in ALLOWED_SELF_REGISTER_ROLES or not is_email(email):
             return self.respond(*json_response({'error': 'Missing fields or invalid role/email'}, 400))
 
@@ -206,7 +245,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
                 cursor.execute("UPDATE users SET token=%s WHERE id=%s", (token, user['id']))
                 conn.commit()
 
-                # отдадим токен + профиль
                 return self.respond(*json_response({
                     'token': token,
                     'user': {
@@ -216,13 +254,8 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
                         'role': user['role'],
                     }
                 }, 200))
-                
+
     def require_admin(self):
-        """
-        Разрешаем только если:
-        - роль admin, ИЛИ
-        - id == 1 (первый аккаунт считаем админом всегда).
-        """
         if not getattr(self, "user", None):
             self.respond(*json_response({'error': 'Unauthorized'}, 401))
             return False
@@ -234,7 +267,7 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         return False
 
     # ========== PLACES =============
-    @auth_required  # или убери, если хочешь публичный список
+    @auth_required
     def list_places(self):
         with get_db_connection() as conn, conn.cursor() as c:
             c.execute("SELECT id, name, description, lat, lon, owner_id FROM places ORDER BY id DESC")
@@ -271,7 +304,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
     def add_review(self):
         data = parse_json(self)
 
-        # place id (поле "id" из тела)
         try:
             place_id = int((data.get('id') or '').strip())
             if place_id <= 0:
@@ -279,7 +311,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         except (ValueError, AttributeError):
             return self.respond(*json_response({'error': 'Invalid place id'}, 400))
 
-        # user id из тела — должен совпадать с токеном
         try:
             body_user_id = int((data.get('userid') or '').strip())
         except (ValueError, AttributeError):
@@ -288,20 +319,17 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         if body_user_id != self.user['id']:
             return self.respond(*json_response({'error': 'Forbidden'}, 403))
 
-        # место существует?
         with get_db_connection() as conn, conn.cursor() as c:
             c.execute("SELECT 1 FROM places WHERE id=%s", (place_id,))
             if not c.fetchone():
                 return self.respond(*json_response({'error': 'Place not found'}, 404))
 
-        # текст
         text = (data.get('text') or '').strip()
         if not text:
             return self.respond(*json_response({'error': 'Text is required'}, 400))
         if len(text) > 4000:
             return self.respond(*json_response({'error': 'Text too long (max 4000)'}, 400))
 
-        # дата: 'DD.MM.YYYY' -> DATE
         raw_date = (data.get('date') or '').strip()
         if raw_date:
             try:
@@ -311,7 +339,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         else:
             created_dt = date.today()
 
-        # вставка
         with get_db_connection() as conn, conn.cursor() as c:
             c.execute(
                 "INSERT INTO reviews (place_id, user_id, text, created_at) VALUES (%s,%s,%s,%s)",
@@ -320,7 +347,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             new_id = c.lastrowid
             conn.commit()
 
-            # ответ: новые поля, дата уже в нужном формате
             c.execute("""
             SELECT id, user_id, text,
                     DATE_FORMAT(created_at, '%%d.%%m.%%Y') AS date
@@ -332,12 +358,10 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
 
     # Получение отзывов по месту — публично
     def get_reviews(self):
-        # 1) пробуем взять id из query (?id=1)
         parsed = urlparse(self.path)
         qs = dict((k, v[0]) for k, v in parse_qs(parsed.query).items())
         raw_id = qs.get('id')
 
-        # 2) если в query нет — попробуем из JSON-тела (на случай, если шлёшь как в POST)
         if raw_id is None:
             try:
                 body = parse_json(self) or {}
@@ -345,7 +369,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
                 body = {}
             raw_id = body.get('id', body.get('place_id'))
 
-        # 3) валидация id
         try:
             place_id = int(str(raw_id).strip())
             if place_id <= 0:
@@ -353,13 +376,11 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         except (TypeError, ValueError, AttributeError):
             return self.respond(*json_response({'error': 'Invalid place id'}, 400))
 
-        # 4) место существует?
         with get_db_connection() as conn, conn.cursor() as c:
             c.execute("SELECT 1 FROM places WHERE id=%s", (place_id,))
             if not c.fetchone():
                 return self.respond(*json_response({'error': 'Place not found'}, 404))
 
-            # 5) забираем отзывы (новые сверху) и сразу форматируем дату
             c.execute("""
             SELECT id,
                     user_id   AS userid,
@@ -371,14 +392,12 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             """, (place_id,))
             rows = c.fetchall()
 
-        # 6) привести id/ userid к строкам, как ты просил
         for r in rows:
             r['id'] = str(r['id'])
             r['userid'] = str(r['userid'])
 
-        # 7) если отзывов нет — вернём 200 и пустой список (удобнее, чем 404)
         return self.respond(*json_response({'reviews': rows}, 200))
-    
+
     # ========== USERS ==============
     @auth_required
     def list_users(self):
@@ -395,12 +414,11 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
         if not self.require_admin():
             return
 
-        data = parse_json(self)  # ожидаем JSON
-        allowed_roles = ROLES  # у тебя уже есть такой список
+        data = parse_json(self)
+        allowed_roles = ROLES
         fields = []
         values = []
 
-        # username
         if 'username' in data:
             username = data['username']
             if not username or not isinstance(username, str):
@@ -408,7 +426,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             fields.append("username=%s")
             values.append(username)
 
-        # passwd -> хэш в sha256
         if 'passwd' in data:
             passwd = data['passwd']
             if not passwd or not isinstance(passwd, str):
@@ -417,7 +434,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
             fields.append("password=%s")
             values.append(pwd_hash)
 
-        # role
         if 'role' in data:
             role = data['role']
             if role not in allowed_roles:
@@ -436,7 +452,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
                 if cursor.rowcount == 0:
                     return self.respond(*json_response({'error': 'User not found'}, 404))
                 conn.commit()
-                # вернуть обновлённую запись
                 cursor.execute("SELECT id, username, role FROM users WHERE id=%s", (user_id,))
                 user = cursor.fetchone()
                 return self.respond(*json_response({'updated': user}, 200))
@@ -445,7 +460,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
     def delete_user(self, user_id: int):
         if not self.require_admin():
             return
-        # Защитимся от удаления ID=1, если хочешь — сними это ограничение
         if user_id == 1:
             return self.respond(*json_response({'error': 'Cannot delete primary admin (id=1)'}, 400))
         with get_db_connection() as conn:
@@ -458,7 +472,6 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
 
     @auth_required
     def get_me(self):
-        # self.user уже содержит id/username/role из декоратора; вытянем email из БД (или добавь в декоратор)
         uid = self.user['id']
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
@@ -470,9 +483,16 @@ class SimpleAPIHandler(BaseHTTPRequestHandler):
 
 # ================== SERVER BOOT ===================
 if __name__ == '__main__':
+    # USE_TLS=1 включит HTTPS, иначе HTTP (dev)
+    use_tls = os.getenv('USE_TLS', '0') == '1'
     httpd = HTTPServer(('0.0.0.0', 8443), SimpleAPIHandler)
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
-    httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
-    print("Server running at https://0.0.0.0:8443")
+
+    if use_tls:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
+        httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+        print("Server running at https://0.0.0.0:8443")
+    else:
+        print("Server running at http://0.0.0.0:8443")
+
     httpd.serve_forever()
