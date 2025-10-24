@@ -128,7 +128,7 @@ export default function MapScreen() {
       <SafeAreaView pointerEvents="box-none" style={styles.safeOverlay}>
         <View pointerEvents="box-none" style={styles.topOverlay}>
           <View style={[styles.searchContainer, searchActive && styles.searchContainerActive]}>
-            <Ionicons name="search" size={18} color="#475569" />
+            <Ionicons name="search" size={18} color="#351f3b" />
             <TextInput
               ref={searchInputRef}
               style={styles.searchInput}
@@ -147,7 +147,7 @@ export default function MapScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={performSearch} style={styles.searchAction} activeOpacity={0.85}>
-              <Ionicons name="arrow-forward-circle" size={22} color="#2563eb" />
+              <Ionicons name="arrow-forward-circle" size={22} color="#cf3abb" />
             </TouchableOpacity>
           </View>
         </View>
@@ -158,7 +158,7 @@ export default function MapScreen() {
           {selectedAddress ? (
             <>
               <View style={styles.infoRow}>
-                <Ionicons name="navigate-outline" size={18} color="#2563eb" />
+                <Ionicons name="navigate-outline" size={18} color="#cf3abb" />
                 <Text style={styles.infoLabel}>Адрес</Text>
               </View>
               <Text style={styles.infoValue}>{selectedAddress}</Text>
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#cf3abb',
     shadowColor: '#1d4ed8',
     shadowOpacity: 0.3,
     shadowRadius: 14,

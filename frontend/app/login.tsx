@@ -20,7 +20,7 @@ import { setUserSession, type UserSession } from '@/lib/user-session';
 
 const THEME = {
   primary: '#6e0aa4',
-  accent: '#0f172a',
+  accent: '#240f2aff',
   muted: '#64748b',
   surface: '#ffffff',
   border: 'rgba(226,232,240,0.8)',
@@ -34,6 +34,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [companyINN, setCompanyINN] = useState('');
   const [accountType, setAccountType] = useState<'user' | 'company'>('user');
 
   const isRegister = mode === 'register';
@@ -162,19 +163,19 @@ export default function AuthScreen() {
                       accountType === 'company' && styles.accountTypeTextActive,
                     ]}
                   >
-                    Компания
+                    Юр. лицо
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            {isRegister && !isCompany && (
+            {!isCompany && (
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Ваше имя</Text>
+                <Text style={styles.label}>Логин</Text>
                 <TextInput
                   value={name}
                   onChangeText={setName}
-                  placeholder="Например, Анна Петрова"
+                  placeholder="TurboIvan2007"
                   style={styles.input}
                   placeholderTextColor={THEME.muted}
                 />
@@ -187,25 +188,40 @@ export default function AuthScreen() {
                 <TextInput
                   value={companyName}
                   onChangeText={setCompanyName}
-                  placeholder="Например, Gorky Park"
+                  placeholder='ООО "Рога и Копыта"'
                   style={styles.input}
                   placeholderTextColor={THEME.muted}
                 />
               </View>
             )}
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="hello@company.ru"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={styles.input}
-                placeholderTextColor={THEME.muted}
-              />
-            </View>
+            {isCompany && (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>ИНН</Text>
+                <TextInput
+                  value={companyINN}
+                  onChangeText={setCompanyINN}
+                  placeholder='1234567890'
+                  style={styles.input}
+                  placeholderTextColor={THEME.muted}
+                />
+              </View>
+            )}
+
+            {isRegister && (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="ivanivanov2007@email.ru"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={styles.input}
+                  placeholderTextColor={THEME.muted}
+                />
+              </View>
+            )}
 
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Пароль</Text>
@@ -219,13 +235,6 @@ export default function AuthScreen() {
               />
             </View>
 
-            {!isRegister && (
-              <TouchableOpacity style={styles.linkRow} onPress={() => router.push('/modal')}>
-                <Ionicons name="help-circle-outline" size={18} color={THEME.primary} />
-                <Text style={styles.linkText}>Забыли пароль?</Text>
-              </TouchableOpacity>
-            )}
-
             <TouchableOpacity
               style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}
               activeOpacity={0.85}
@@ -238,19 +247,6 @@ export default function AuthScreen() {
               <View style={styles.line} />
               <Text style={styles.separatorText}>или</Text>
               <View style={styles.line} />
-            </View>
-
-            <View style={styles.socialRow}>
-              <Pressable style={styles.socialButton}>
-                <View style={styles.socialIcon}>
-                  <Text style={styles.socialLetter}>Я</Text>
-                </View>
-                <Text style={styles.socialText}>Yandex</Text>
-              </Pressable>
-              <Pressable style={styles.socialButton}>
-                <Ionicons name="logo-vk" size={20} color={THEME.accent} />
-                <Text style={styles.socialText}>VK</Text>
-              </Pressable>
             </View>
 
             <View style={styles.switchRow}>
@@ -271,7 +267,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#f2f4fa',
+    backgroundColor: '#351f3b',
   },
   scroll: {
     flexGrow: 1,
@@ -283,14 +279,14 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     backgroundColor: THEME.surface,
-    borderRadius: 28,
-    padding: 28,
-    gap: 20,
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.08,
+    borderRadius: 26,
+    padding: 26,
+    gap: 16,
+    shadowColor: '#cf3abb',
+    shadowOpacity: 0.18,
     shadowRadius: 32,
     shadowOffset: { width: 0, height: 20 },
-    elevation: 10,
+    elevation: 16,
     borderWidth: 1,
     borderColor: THEME.border,
   },
@@ -353,7 +349,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 14,
     alignItems: 'center',
-    shadowColor: '#2563eb',
+    shadowColor: '#b325ebff',
     shadowOpacity: 0.28,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 12 },

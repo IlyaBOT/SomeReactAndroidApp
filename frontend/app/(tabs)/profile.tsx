@@ -60,20 +60,6 @@ export default function ProfileScreen() {
   const companyFollowers = companyPosts[0]?.followers ?? 0;
   const companyTotalLikes = companyPosts.reduce((sum, post) => sum + post.totalLikes, 0);
 
-  // Хедер статус
-  const headerStats = useMemo(() => {
-    if (isCompany) {
-      return [
-        { label: 'Избранное', value: formatNumber(favorites.length) },
-      ];
-    }
-
-    return [
-      { label: 'Избранное', value: formatNumber(favorites.length) },
-    ];
-  }, [companyFollowers, companyPosts.length, companyTotalLikes, favorites.length, isCompany, liked.length, session?.following?.length]);
-
-
   const handleLogout = () => {
     clearUserSession();
     setSession(null);
@@ -88,24 +74,14 @@ export default function ProfileScreen() {
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.headerCard}>
-          <Image source={{ uri: session.avatar }} style={styles.avatar} />
           <ThemedText type="title" style={styles.displayName}>
-            {session.name}
+            Здравствуйте, {session.name}!
           </ThemedText>
-          <Text style={styles.handle}>@{session.handle}</Text>
           <View style={styles.accountTag}>
-            <Ionicons name={session.accountType === 'company' ? 'business' : 'person'} size={16} color="#6e0aa4" />
+            <Ionicons name={session.accountType === 'company' ? 'business' : 'mail'} size={16} color="#6e0aa4" />
             <Text style={styles.accountTagText}>
-              {session.accountType === 'company' ? 'Аккаунт компании' : 'Личный аккаунт'}
+              {session.accountType === 'company' ? 'Аккаунт компании' : session.handle}
             </Text>
-          </View>
-          <View style={styles.statsRow}>
-            {headerStats.map(stat => (
-              <View key={stat.label} style={styles.statCard}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
           </View>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.85}>
             <Ionicons name="log-out-outline" size={18} color="#ef4444" />

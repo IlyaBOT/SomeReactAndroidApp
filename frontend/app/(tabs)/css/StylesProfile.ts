@@ -13,6 +13,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 28,
+    marginTop: 32,
     padding: 24,
     gap: 14,
     shadowColor: '#0f172a',
@@ -21,12 +22,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 18 },
     elevation: 12,
   },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-  },
   displayName: {
+    fontSize: 24,
     color: '#0f172a',
   },
   handle: {
@@ -43,7 +40,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(37, 99, 235, 0.12)',
   },
   accountTagText: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1d4ed8',
   },
@@ -201,8 +198,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 20,
-    backgroundColor: '#2563eb',
-    shadowColor: '#2563eb',
+    backgroundColor: '#cf3abb',
+    shadowColor: '#cf3abb',
     shadowOpacity: 0.25,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
@@ -226,7 +223,7 @@ const styles = StyleSheet.create({
   companyActionSecondaryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2563eb',
+    color: '#cf3abb',
   },
   companyReviewsList: {
     gap: 12,
@@ -258,7 +255,7 @@ const styles = StyleSheet.create({
   companyReviewPlace: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2563eb',
+    color: '#cf3abb',
   },
   companyReviewRating: {
     flexDirection: 'row',

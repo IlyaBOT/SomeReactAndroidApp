@@ -26,22 +26,6 @@ type NearbyPost = NormalizedPost;
 
 const allPostsNormalized = normalizePosts(sourcePosts);
 
-const categoryOptions = (() => {
-  const unique = new Map<string, string>();
-  for (const post of allPostsNormalized) {
-    for (const tag of post.tags) {
-      const key = tag.toLowerCase();
-      if (!unique.has(key)) {
-        unique.set(key, tag);
-      }
-    }
-  }
-  return [
-    { id: 'all', name: 'Все', icon: 'apps' as const },
-    ...Array.from(unique.entries()).map(([id, name]) => ({ id, name, icon: 'pricetag-outline' as const }))
-  ];
-})();
-
 export default function NearbyScreen() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -121,7 +105,7 @@ export default function NearbyScreen() {
           activeOpacity={0.85}
           onPress={() => openInMap(item)}
         >
-          <Ionicons name="location-outline" size={16} color="#2563eb" />
+          <Ionicons name="location-outline" size={16} color="#cf3abb" />
           <Text style={styles.addressText}>{item.address}</Text>
         </TouchableOpacity>
         <View style={styles.tagRow}>
@@ -171,29 +155,6 @@ export default function NearbyScreen() {
             
           </ThemedText>
         </View>
-
-        <FlatList
-          horizontal
-          data={categoryOptions}
-          keyExtractor={item => item.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.categoryChip, selectedCategory === item.id && styles.categoryChipActive]}
-              onPress={() => handleCategorySelect(item.id)}
-            >
-              <Ionicons
-                name={item.icon}
-                size={16}
-                color={selectedCategory === item.id ? '#fff' : '#2563eb'}
-              />
-              <Text style={selectedCategory === item.id ? styles.categoryChipTextActive : styles.categoryChipText}>
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
       </View>
 
       <FlatList
@@ -204,12 +165,12 @@ export default function NearbyScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="location-outline" size={64} color="#c6c6c8" />
+            {/* <Ionicons name="location-outline" size={64} color="#c6c6c8" /> */}
             <ThemedText type="defaultSemiBold" style={styles.emptyTitle}>
-              Ничего не найдено
+              У вас нет закладок
             </ThemedText>
             <ThemedText style={styles.emptyText}>
-              Попробуйте выбрать другую категорию
+              Добавьте объект в закладки и он появится тут
             </ThemedText>
           </View>
         }
@@ -242,7 +203,7 @@ export default function NearbyScreen() {
                     openInMap(activePost);
                   }}
                 >
-                  <Ionicons name="location-outline" size={18} color="#2563eb" />
+                  <Ionicons name="location-outline" size={18} color="#cf3abb" />
                   <Text style={styles.detailAddressText}>{activePost.address}</Text>
                 </TouchableOpacity>
                 <View style={styles.detailTags}>
@@ -308,9 +269,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
+    paddingTop: 32,
+    justifyContent: 'center',
+    textAlign: 'center',
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#2a0f2a',
   },
   subtitle: {
     fontSize: 14,
@@ -428,7 +392,7 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2563eb',
+    color: '#cf3abb',
     textDecorationLine: 'underline',
   },
   tagRow: {

@@ -57,12 +57,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   categoryChipActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#cf3abb',
   },
   categoryChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2563eb',
+    color: '#cf3abb',
   },
   categoryChipTextActive: {
     fontSize: 13,
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2563eb',
+    color: '#cf3abb',
     textDecorationLine: 'underline',
   },
   tagRow: {

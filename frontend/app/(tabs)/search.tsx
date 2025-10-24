@@ -167,7 +167,7 @@ export default function SearchScreen() {
           activeOpacity={0.85}
           onPress={() => openInMap(item)}
         >
-          <Ionicons name="location-outline" size={16} color="#2563eb" />
+          <Ionicons name="location-outline" size={16} color="#cf3abb" />
           <Text style={styles.addressText}>{item.address}</Text>
         </TouchableOpacity>
         <View style={styles.tagRow}>
@@ -243,7 +243,7 @@ export default function SearchScreen() {
               <Ionicons
                 name={item.icon}
                 size={16}
-                color={selectedCategory === item.id ? '#fff' : '#2563eb'}
+                color={selectedCategory === item.id ? '#fff' : '#cf3abb'}
               />
               <Text style={selectedCategory === item.id ? styles.categoryChipTextActive : styles.categoryChipText}>
                 {item.name}
@@ -315,7 +315,7 @@ export default function SearchScreen() {
                     openInMap(activePost);
                   }}
                 >
-                  <Ionicons name="location-outline" size={18} color="#2563eb" />
+                  <Ionicons name="location-outline" size={18} color="#cf3abb" />
                   <Text style={styles.detailAddressText}>{activePost.address}</Text>
                 </TouchableOpacity>
                 <View style={styles.detailTags}>
